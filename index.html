@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kasir Mini Portable Pro</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  body { font-family: sans-serif; background: #f5f5f5; margin: 0; padding: 20px; color: #333; }
+  .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+  button { background: #4285f4; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; margin: 4px 0; font-weight: bold; width: 100%; box-sizing: border-box; }
+  button.secondary { background: #34a853; }
+  button.danger { background: #db4437; width: auto; padding: 4px 10px; }
+  input { padding: 10px; width: 100%; margin: 6px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+  .hidden { display: none; }
+  #reader { width: 100%; margin: 10px 0; border-radius: 8px; overflow: hidden; background: #000; }
+  .produk, .cart-item { border-bottom: 1px solid #eee; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; }
+  .total { font-size: 22px; font-weight: bold; margin: 15px 0; color: #222; border-top: 2px dashed #eee; padding-top: 10px; }
+  .flex-group { display: flex; gap: 8px; }
+  .flex-group button { width: auto; white-space: nowrap; }
+  small { color: #777; }
+  #listProduk { max-height: 200px; overflow-y: auto; margin-top: 10px; border: 1px solid #eee; padding: 10px; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<div class="container" id="loginBox">
+  <h2>Kasir Mini Portable 🔥</h2>
+  <p>Silakan login terlebih dahulu untuk mengelola produk dan transaksi Anda.</p>
+  <button onclick="loginGoogle()">Login dengan Google</button>
+</div>
+
+<div class="container hidden" id="appBox">
+  <h2>Halo, <span id="userName"></span> 👋</h2>
+  <button class="danger" onclick="logout()" style="width: auto;">Logout</button>
+  <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+
+  <h3>1. Tambah / Update Produk</h3>
+  <input id="namaProduk" placeholder="Nama Produk">
+  <input id="hargaProduk" type="number" placeholder="Harga Jual (Rp)">
+  <div class="flex-group">
+    <input id="barcodeProduk" placeholder="Barcode / QR Code">
+    <button onclick="scanBarcode('barcodeProduk')">📷 Scan</button>
+  </div>
+  <button class="secondary" onclick="tambahProduk()">Simpan Produk</button>
+  
+  <div id="listProduk"></div>
+
+  <hr style="border: 0; border-top: 1px solid #eee; margin: 25px 0;">
+  
+  <h3>2. Kasir (Scan Barang)</h3>
+  <button onclick="scanBarcode('scanKasir')">📷 Buka Scanner Kasir</button>
+  <div id="reader" class="hidden"></div>
+  
+  <div class="flex-group" style="margin-top: 8px;">
+    <input id="manualBarcode" placeholder="Ketik barcode manual jika scan gagal...">
+    <button onclick="tambahManualKasir()">Tambah</button>
+  </div>
+
+  <div id="keranjang"></div>
+  <div class="total">Total: <span id="totalHarga">Rp0</span></div>
+  
+  <h3>3. Pembayaran</h3>
+  <input id="bayar" type="number" placeholder="Jumlah Uang Tunai (Rp)" oninput="hitungKembalian()">
+  <div style="font-size: 18px; margin: 10px 0; font-weight: bold;">
+    Kembalian: <span id="kembalian">Rp0</span>
+  </div>
+  <button onclick="simpanTransaksi()">Simpan & Cetak Struk via Alert</button>
+</div>
+
+<script type="module">
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDrG_WTRHBpFy0jE1qFdKFDIs2AdfYgQzw",
+  authDomain: "kasir-mini-portable.firebaseapp.com",
+  projectId: "kasir-mini-portable",
+  storageBucket: "kasir-mini-portable.firebasestorage.app",
+  messagingSenderId: "634322105919",
+  appId: "1:63aku4322105919:web:42ddc9f849cd11d0d92a8a"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+// ==========================================
+// GANTI INI DENGAN KONFIGURASI FIREBASE KAMU
+// ==========================================
+const firebaseConfig = {
+  apiKey: "API_KEY_KAMU",
+  authDomain: "PROJECT_ID.firebaseapp.com",
+  projectId: "PROJECT_ID",
+  storageBucket: "PROJECT_ID.appspot.com",
+  messagingSenderId: "SENDER_ID",
+  appId: "APP_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let userId = null;
+let produkCache = []; // Tempat menyimpan data produk lokal (hemat kuota Firebase)
+let keranjang = [];   // Menyimpan item belanja format: { barcode, nama, harga, qty }
+let html5QrCode = null;
+
+// FORMAT RUPIAH UTILITY
+const formatRupiah = (angka) => "Rp" + Number(angka).toLocaleString('id-ID');
+
+// LOGIN & LOGOUT
+window.loginGoogle = async () => {
+  const provider = new GoogleAuthProvider();
+  await signInWithPopup(auth, provider).catch(err => alert(err.message));
+}
+window.logout = () => {
+  if(html5QrCode) { html5QrCode.stop().catch(()=>{}); }
+  signOut(auth);
+}
+
+onAuthStateChanged(auth, user => {
+  if(user){
+    userId = user.uid;
+    document.getElementById('userName').innerText = user.displayName;
+    document.getElementById('loginBox').classList.add('hidden');
+    document.getElementById('appBox').classList.remove('hidden');
+    listenProduk(); // Aktifkan realtime sync
+  } else {
+    userId = null;
+    produkCache = [];
+    keranjang = [];
+    document.getElementById('loginBox').classList.remove('hidden');
+    document.getElementById('appBox').classList.add('hidden');
+  }
+});
+
+// REALTIME LISTENER PRODUK (Menghemat read Firebase dibanding getDocs berulang)
+function listenProduk(){
+  const q = query(collection(db, "produk"), where("userId", "==", userId));
+  onSnapshot(q, snap => {
+    produkCache = [];
+    let html = '<h4>List Produk Terdaftar:</h4>';
+    snap.forEach(doc => {
+      const p = doc.data();
+      produkCache.push(p);
+      html += `<div class="produk">
+        <div><strong>${p.nama}</strong><br><small>${p.barcode}</small></div>
+        <div>${formatRupiah(p.harga)}</div>
+      </div>`;
+    });
+    if(produkCache.length === 0) html += '<p style="color:#999"><small>Belum ada produk.</small></p>';
+    document.getElementById('listProduk').innerHTML = html;
+  });
+}
+
+// SCANNER BARCODE
+window.scanBarcode = (targetInputId) => {
+  const readerDiv = document.getElementById('reader');
+  readerDiv.classList.remove('hidden');
+  
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => startScanner(targetInputId));
+  } else {
+    startScanner(targetInputId);
+  }
+}
+
+function startScanner(targetInputId) {
+  const readerDiv = document.getElementById('reader');
+  html5QrCode = new Html5Qrcode("reader");
+  html5QrCode.start(
+    { facingMode: "environment" }, 
+    { fps: 10, qrbox: { width: 250, height: 150 } },
+    barcode => {
+      document.getElementById(targetInputId).value = barcode;
+      html5QrCode.stop().then(() => {
+        readerDiv.classList.add('hidden');
+      }).catch(()=>{});
+      
+      if(targetInputId === 'scanKasir') {
+        tambahKeKeranjang(barcode);
+      }
+    },
+    error => { /* Mengabaikan logs error scan nyari target */ }
+  ).catch(err => {
+    alert("Gagal membuka kamera: " + err);
+    readerDiv.classList.add('hidden');
+  });
+}
+
+// TAMBAH PRODUK BARU KE DATABASE
+window.tambahProduk = async () => {
+  const nama = document.getElementById('namaProduk').value.trim();
+  const harga = Number(document.getElementById('hargaProduk').value);
+  const barcode = document.getElementById('barcodeProduk').value.trim();
+  
+  if(!nama || !harga || !barcode) return alert('Lengkapi data produk!');
+  
+  // Validasi agar barcode tidak duplikat di data lokal
+  const cekDuplikat = produkCache.find(p => p.barcode === barcode);
+  if(cekDuplikat) return alert(`Barcode sudah digunakan oleh produk: ${cekDuplikat.nama}`);
+
+  try {
+    await addDoc(collection(db, "produk"), { userId, nama, harga, barcode });
+    alert('Produk berhasil disimpan!');
+    document.getElementById('namaProduk').value = '';
+    document.getElementById('hargaProduk').value = '';
+    document.getElementById('barcodeProduk').value = '';
+  } catch (error) {
+    alert('Gagal menyimpan ke Firebase: ' + error.message);
+  }
+}
+
+// MANUAL INPUT KASIR (Alternatif jika kamera error/tidak fokus)
+window.tambahManualKasir = () => {
+  const input = document.getElementById('manualBarcode');
+  if(!input.value.trim()) return;
+  tambahKeKeranjang(input.value.trim());
+  input.value = '';
+}
+
+// LOGIKA KERANJANG BELANJA (Optimasi Quantity)
+function tambahKeKeranjang(barcode){
+  // Cari di cache lokal, bukan menembak database Firestore lagi (Hemat Kuota)
+  const produk = produkCache.find(p => p.barcode === barcode);
+  
+  if(!produk) {
+    return alert('Produk tidak ditemukan di database! Silakan daftarkan produk terlebih dahulu.');
+  }
+  
+  // Cek apakah barang sudah ada di keranjang
+  const itemIndex = keranjang.findIndex(item => item.barcode === barcode);
+  
+  if(itemIndex > -1) {
+    // Jika ada, tambahkan Qty nya saja
+    keranjang[itemIndex].qty += 1;
+  } else {
+    // Jika belum ada, push objek baru beserta properti qty
+    keranjang.push({
+      barcode: produk.barcode,
+      nama: produk.nama,
+      harga: produk.harga,
+      qty: 1
+    });
+  }
+  renderKeranjang();
+}
+
+function renderKeranjang(){
+  let html = '<h4>Keranjang Belanja:</h4>';
+  let total = 0;
+  
+  keranjang.forEach((item, i) => {
+    const subtotal = item.harga * item.qty;
+    total += subtotal;
+    html += `<div class="cart-item">
+      <div>
+        <strong>${item.nama}</strong> <small>(${item.qty}x)</small><br>
+        <small>${formatRupiah(item.harga)}</small>
+      </div>
+      <div>
+        <span style="margin-right:10px; font-weight:bold;">${formatRupiah(subtotal)}</span>
+        <button class="danger" onclick="hapusItem(${i})">X</button>
+      </div>
+    </div>`;
+  });
+  
+  if(keranjang.length === 0) html += '<p style="color:#999"><small>Keranjang kosong.</small></p>';
+  
+  document.getElementById('keranjang').innerHTML = html;
+  document.getElementById('totalHarga').innerText = formatRupiah(total);
+  hitungKembalian();
+}
+
+window.hapusItem = (index) => {
+  if(keranjang[index].qty > 1) {
+    keranjang[index].qty -= 1;
+  } else {
+    keranjang.splice(index, 1);
+  }
+  renderKeranjang();
+}
+
+window.hitungKembalian = () => {
+  const total = keranjang.reduce((acc, item) => acc + (item.harga * item.qty), 0);
+  const bayar = Number(document.getElementById('bayar').value) || 0;
+  const selisih = bayar - total;
+  
+  document.getElementById('kembalian').innerText = formatRupiah(selisih >= 0 ? selisih : 0);
+}
+
+// SIMPAN TRANSAKSI PENJUALAN
+window.simpanTransaksi = async () => {
+  if(keranjang.length === 0) return alert('Keranjang masih kosong!');
+  
+  const total = keranjang.reduce((acc, item) => acc + (item.harga * item.qty), 0);
+  const bayar = Number(document.getElementById('bayar').value);
+  
+  if(bayar < total) return alert('Uang pembayaran kurang!');
+  
+  const kembalian = bayar - total;
+
+  try {
+    await addDoc(collection(db, "penjualan"), {
+      userId,
+      items: keranjang,
+      total,
+      bayar,
+      kembalian,
+      waktu: serverTimestamp()
+    });
+    
+    // Cetak Struk Sederhana via Alert / Prompt Browser
+    let strukText = `=== STRUK PEMBAYARAN ===\n\n`;
+    keranjang.forEach(item => {
+      strukText += `${item.nama} x${item.qty} : ${formatRupiah(item.harga * item.qty)}\n`;
+    });
+    strukText += `\n-----------------------\n`;
+    strukText += `Total      : ${formatRupiah(total)}\n`;
+    strukText += `Bayar      : ${formatRupiah(bayar)}\n`;
+    strukText += `Kembalian  : ${formatRupiah(kembalian)}\n\n`;
+    strukText += `Transaksi Berhasil disimpan!`;
+    
+    alert(strukText);
+
+    // Reset Form Kasir
+    keranjang = [];
+    document.getElementById('bayar').value = '';
+    renderKeranjang();
+  } catch (error) {
+    alert("Gagal menyimpan transaksi: " + error.message);
+  }
+}
+</script>
+</body>
+</html>
