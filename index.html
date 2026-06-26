@@ -9,28 +9,26 @@
   body { font-family: sans-serif; background: #f5f5f5; margin: 0; padding: 15px; color: #333; }
   .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
   
-  /* Desain Header & Logout */
   .header-app { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
   .header-app h2 { margin: 0; font-size: 18px; }
   
-  /* Sistem Tab Premium */
   .tab-container { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 20px; gap: 4px; }
   .tab-button { flex: 1; background: #e0e0e0; color: #555; border: none; padding: 12px 8px; font-weight: bold; cursor: pointer; border-radius: 8px 8px 0 0; transition: all 0.3s ease; font-size: 13px; text-align: center; }
   .tab-button.active { background: #4285f4; color: white; border-bottom: 2px solid #1a73e8; }
   .tab-content { display: none; }
   .tab-content.active { display: block; }
 
-  /* Tombol & Form umum */
   button { background: #4285f4; color: white; border: none; padding: 12px 16px; border-radius: 8px; cursor: pointer; margin: 6px 0; font-weight: bold; width: 100%; box-sizing: border-box; font-size: 14px; }
   button.secondary { background: #34a853; }
   button.danger { background: #db4437; width: auto; padding: 6px 12px; font-size: 12px; border-radius: 6px; }
   input { padding: 12px; width: 100%; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
   .hidden { display: none; }
   
-  /* Kamera Scanner */
-  #reader { width: 100%; margin: 10px 0; border-radius: 8px; overflow: hidden; background: #000; }
+  /* BOX KAMERA PORTABLE (Dipindah ke atas agar fleksibel) */
+  #cameraArea { background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 15px; position: relative; }
+  #reader { width: 100%; background: #000; }
+  .btn-close-cam { background: #db4437; color: white; padding: 8px 12px; font-size: 12px; border: none; border-radius: 6px; cursor: pointer; margin: 10px; width: auto; position: absolute; top: 0; right: 0; z-index: 10; }
   
-  /* List data & Totalan */
   .produk, .cart-item { border-bottom: 1px solid #eee; padding: 12px 0; display: flex; justify-content: space-between; align-items: center; }
   .total { font-size: 24px; font-weight: bold; margin: 15px 0; color: #111; background: #e8f0fe; padding: 12px; border-radius: 8px; text-align: center; }
   .flex-group { display: flex; gap: 8px; align-items: center; }
@@ -52,6 +50,11 @@
   <div class="header-app">
     <h2>Halo, <span id="userName"></span> 👋</h2>
     <button class="danger" onclick="logout()">Logout</button>
+  </div>
+
+  <div id="cameraArea" class="hidden">
+    <button class="btn-close-cam" onclick="tutupKameraManual()">❌ Tutup Kamera</button>
+    <div id="reader"></div>
   </div>
 
   <div class="tab-container">
@@ -76,7 +79,6 @@
   <div id="tabKasir" class="tab-content">
     <h3>Kasir (Scan Barang)</h3>
     <button style="background: #1a73e8;" onclick="scanBarcode('scanKasir')">📷 Buka Kamera Scanner</button>
-    <div id="reader" class="hidden"></div>
     
     <div class="flex-group" style="margin-top: 10px; margin-bottom: 15px;">
       <input id="manualBarcode" placeholder="Ketik manual jika barcode rusak...">
@@ -107,7 +109,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
 import { getFirestore, collection, addDoc, onSnapshot, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
 // =========================================================
-// MASUKKAN KODE KONFIGURASI ASLI DARI FIREBASE KAMU DI SINI:
+// PASTIKAN MENGGANTI KODE DI BAWAH INI DENGAN CONFIG KAMU ASLI!
 // =========================================================
 const firebaseConfig = {
   apiKey: "AIzaSyDrG_WTRHBpFy0jE1qFdKFDIs2AdfYgQzw",
@@ -129,31 +131,24 @@ let html5QrCode = null;
 
 const formatRupiah = (angka) => "Rp" + Number(angka).toLocaleString('id-ID');
 
-// FUNGSI PERPINDAHAN TAB (YANG BARU & SUDAH AMAN)
+// PERPINDAHAN TAB
 window.switchTab = (tabId) => {
-  // Matikan semua content tab
   document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-  // Matikan semua tombol aktif
   document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
   
-  // Aktifkan konten tab yang dipilih
   document.getElementById(tabId).classList.add('active');
   
-  // Amankan pewarnaan tombol tab, baik diklik manual maupun otomatis oleh sistem
   if (window.event && window.event.currentTarget && window.event.currentTarget.classList) {
     window.event.currentTarget.classList.add('active');
   } else {
-    // Jika dipicu otomatis, cari tombolnya lewat teks/id-nya secara manual
     const indexBtn = tabId === 'tabTambah' ? 0 : tabId === 'tabKasir' ? 1 : 2;
     const targets = document.querySelectorAll('.tab-button');
     if(targets[indexBtn]) targets[indexBtn].classList.add('active');
   }
 
-  // Matikan scanner secara otomatis saat berpindah tab agar menghemat baterai HP
-  if (html5QrCode && tabId !== 'tabKasir' && tabId !== 'tabTambah') {
-    html5QrCode.stop().then(() => {
-      document.getElementById('reader').classList.add('hidden');
-    }).catch(()=>{});
+  // Matikan kamera otomatis jika pindah ke tab pembayaran
+  if (tabId === 'tabBayar') {
+    tutupKameraManual();
   }
 }
 
@@ -163,7 +158,7 @@ window.loginGoogle = async () => {
 }
 
 window.logout = () => {
-  if(html5QrCode) { html5QrCode.stop().catch(()=>{}); }
+  tutupKameraManual();
   signOut(auth);
 }
 
@@ -201,38 +196,55 @@ function listenProduk(){
   });
 }
 
+// MANAGEMENT AKTIVASI SCANNER KAMERA
 window.scanBarcode = (targetInputId) => {
-  const readerDiv = document.getElementById('reader');
-  readerDiv.classList.remove('hidden');
+  document.getElementById('cameraArea').classList.remove('hidden');
   
   if (html5QrCode) {
-    html5QrCode.stop().then(() => startScanner(targetInputId));
+    html5QrCode.stop().then(() => startScanner(targetInputId)).catch(() => startScanner(targetInputId));
   } else {
     startScanner(targetInputId);
   }
 }
 
 function startScanner(targetInputId) {
-  const readerDiv = document.getElementById('reader');
   html5QrCode = new Html5Qrcode("reader");
+  
+  // Menggunakan konfigurasi dinamis qrbox agar fleksibel di segala jenis kamera HP
+  const qrboxFunction = (viewfinderWidth, viewfinderHeight) => {
+    const minEdgePercentage = 0.7;
+    const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+    const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+    return { width: qrboxSize, height: Math.floor(qrboxSize * 0.6) };
+  };
+
   html5QrCode.start(
     { facingMode: "environment" }, 
-    { fps: 10, qrbox: { width: 250, height: 150 } },
+    { fps: 15, qrbox: qrboxFunction },
     barcode => {
       document.getElementById(targetInputId).value = barcode;
-      html5QrCode.stop().then(() => {
-        readerDiv.classList.add('hidden');
-      }).catch(()=>{});
+      
+      // Mengeluarkan bunyi getar pendek jika didukung HP (umpan balik berhasil scan)
+      if (navigator.vibrate) navigator.vibrate(100);
+
+      tutupKameraManual();
       
       if(targetInputId === 'scanKasir') {
         tambahKeKeranjang(barcode);
       }
     },
-    error => {}
+    error => { /* Proses scanning berjalan mencari target... */ }
   ).catch(err => {
-    alert("Gagal membuka kamera: " + err);
-    readerDiv.classList.add('hidden');
+    alert("Gagal mengakses kamera! Pastikan izin kamera di browser sudah diberikan.");
+    document.getElementById('cameraArea').classList.add('hidden');
   });
+}
+
+window.tutupKameraManual = () => {
+  document.getElementById('cameraArea').classList.add('hidden');
+  if (html5QrCode) {
+    html5QrCode.stop().catch(()=>{});
+  }
 }
 
 window.tambahProduk = async () => {
@@ -265,7 +277,7 @@ window.tambahManualKasir = () => {
 
 function tambahKeKeranjang(barcode){
   const produk = produkCache.find(p => p.barcode === barcode);
-  if(!produk) return alert('Produk tidak ditemukan!');
+  if(!produk) return alert('Produk tidak ditemukan! Daftarkan dulu di Tab 1.');
   
   const itemIndex = keranjang.findIndex(item => item.barcode === barcode);
   if(itemIndex > -1) {
@@ -290,7 +302,6 @@ function renderKeranjang(){
   if(keranjang.length === 0) html += '<p style="color:#999"><small>Keranjang kosong.</small></p>';
   document.getElementById('keranjang').innerHTML = html;
   
-  // Update total harga di Tab 2 dan Tab 3 sekalian
   document.getElementById('totalHarga').innerText = formatRupiah(total);
   document.getElementById('totalTagihanTab3').innerText = formatRupiah(total);
   hitungKembalian();
@@ -328,7 +339,6 @@ window.simpanTransaksi = async () => {
     document.getElementById('bayar').value = '';
     renderKeranjang();
     
-    // Kembalikan otomatis ke Tab Kasir setelah transaksi selesai sukses
     switchTab('tabKasir');
   } catch (error) {
     alert("Gagal menyimpan transaksi: " + error.message);
