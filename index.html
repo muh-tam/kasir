@@ -69,12 +69,13 @@
 </div>
 
 <script type="module">
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-// Your web app's Firebase configuration
+// =========================================================
+// MASUKKAN KODE KONFIGURASI ASLI DARI FIREBASE KAMU DI SINI:
+// =========================================================
 const firebaseConfig = {
   apiKey: "AIzaSyDrG_WTRHBpFy0jE1qFdKFDIs2AdfYgQzw",
   authDomain: "kasir-mini-portable.firebaseapp.com",
@@ -83,19 +84,18 @@ const firebaseConfig = {
   messagingSenderId: "634322105919",
   appId: "1:634322105919:web:42ddc9f849cd11d0d92a8a"
 };
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 let userId = null;
-let produkCache = []; // Tempat menyimpan data produk lokal (hemat kuota Firebase)
-let keranjang = [];   // Menyimpan item belanja format: { barcode, nama, harga, qty }
+let produkCache = [];
+let keranjang = [];
 let html5QrCode = null;
 
-// FORMAT RUPIAH UTILITY
 const formatRupiah = (angka) => "Rp" + Number(angka).toLocaleString('id-ID');
 
-// LOGIN & LOGOUT
 window.loginGoogle = async () => {
   const provider = new GoogleAuthProvider();
   await signInWithPopup(auth, provider).catch(err => alert(err.message));
@@ -111,7 +111,7 @@ onAuthStateChanged(auth, user => {
     document.getElementById('userName').innerText = user.displayName;
     document.getElementById('loginBox').classList.add('hidden');
     document.getElementById('appBox').classList.remove('hidden');
-    listenProduk(); // Aktifkan realtime sync
+    listenProduk();
   } else {
     userId = null;
     produkCache = [];
@@ -121,7 +121,6 @@ onAuthStateChanged(auth, user => {
   }
 });
 
-// REALTIME LISTENER PRODUK (Menghemat read Firebase dibanding getDocs berulang)
 function listenProduk(){
   const q = query(collection(db, "produk"), where("userId", "==", userId));
   onSnapshot(q, snap => {
@@ -140,7 +139,6 @@ function listenProduk(){
   });
 }
 
-// SCANNER BARCODE
 window.scanBarcode = (targetInputId) => {
   const readerDiv = document.getElementById('reader');
   readerDiv.classList.remove('hidden');
@@ -168,14 +166,13 @@ function startScanner(targetInputId) {
         tambahKeKeranjang(barcode);
       }
     },
-    error => { /* Mengabaikan logs error scan nyari target */ }
+    error => {}
   ).catch(err => {
     alert("Gagal membuka kamera: " + err);
     readerDiv.classList.add('hidden');
   });
 }
 
-// TAMBAH PRODUK BARU KE DATABASE
 window.tambahProduk = async () => {
   const nama = document.getElementById('namaProduk').value.trim();
   const harga = Number(document.getElementById('hargaProduk').value);
@@ -183,7 +180,6 @@ window.tambahProduk = async () => {
   
   if(!nama || !harga || !barcode) return alert('Lengkapi data produk!');
   
-  // Validasi agar barcode tidak duplikat di data lokal
   const cekDuplikat = produkCache.find(p => p.barcode === barcode);
   if(cekDuplikat) return alert(`Barcode sudah digunakan oleh produk: ${cekDuplikat.nama}`);
 
@@ -198,7 +194,6 @@ window.tambahProduk = async () => {
   }
 }
 
-// MANUAL INPUT KASIR (Alternatif jika kamera error/tidak fokus)
 window.tambahManualKasir = () => {
   const input = document.getElementById('manualBarcode');
   if(!input.value.trim()) return;
@@ -206,29 +201,15 @@ window.tambahManualKasir = () => {
   input.value = '';
 }
 
-// LOGIKA KERANJANG BELANJA (Optimasi Quantity)
 function tambahKeKeranjang(barcode){
-  // Cari di cache lokal, bukan menembak database Firestore lagi (Hemat Kuota)
   const produk = produkCache.find(p => p.barcode === barcode);
+  if(!produk) return alert('Produk tidak ditemukan!');
   
-  if(!produk) {
-    return alert('Produk tidak ditemukan di database! Silakan daftarkan produk terlebih dahulu.');
-  }
-  
-  // Cek apakah barang sudah ada di keranjang
   const itemIndex = keranjang.findIndex(item => item.barcode === barcode);
-  
   if(itemIndex > -1) {
-    // Jika ada, tambahkan Qty nya saja
     keranjang[itemIndex].qty += 1;
   } else {
-    // Jika belum ada, push objek baru beserta properti qty
-    keranjang.push({
-      barcode: produk.barcode,
-      nama: produk.nama,
-      harga: produk.harga,
-      qty: 1
-    });
+    keranjang.push({ barcode: produk.barcode, nama: produk.nama, harga: produk.harga, qty: 1 });
   }
   renderKeranjang();
 }
@@ -236,24 +217,15 @@ function tambahKeKeranjang(barcode){
 function renderKeranjang(){
   let html = '<h4>Keranjang Belanja:</h4>';
   let total = 0;
-  
   keranjang.forEach((item, i) => {
     const subtotal = item.harga * item.qty;
     total += subtotal;
     html += `<div class="cart-item">
-      <div>
-        <strong>${item.nama}</strong> <small>(${item.qty}x)</small><br>
-        <small>${formatRupiah(item.harga)}</small>
-      </div>
-      <div>
-        <span style="margin-right:10px; font-weight:bold;">${formatRupiah(subtotal)}</span>
-        <button class="danger" onclick="hapusItem(${i})">X</button>
-      </div>
+      <div><strong>${item.nama}</strong> <small>(${item.qty}x)</small><br><small>${formatRupiah(item.harga)}</small></div>
+      <div><span style="margin-right:10px; font-weight:bold;">${formatRupiah(subtotal)}</span><button class="danger" onclick="hapusItem(${i})">X</button></div>
     </div>`;
   });
-  
   if(keranjang.length === 0) html += '<p style="color:#999"><small>Keranjang kosong.</small></p>';
-  
   document.getElementById('keranjang').innerHTML = html;
   document.getElementById('totalHarga').innerText = formatRupiah(total);
   hitungKembalian();
@@ -272,45 +244,21 @@ window.hitungKembalian = () => {
   const total = keranjang.reduce((acc, item) => acc + (item.harga * item.qty), 0);
   const bayar = Number(document.getElementById('bayar').value) || 0;
   const selisih = bayar - total;
-  
   document.getElementById('kembalian').innerText = formatRupiah(selisih >= 0 ? selisih : 0);
 }
 
-// SIMPAN TRANSAKSI PENJUALAN
 window.simpanTransaksi = async () => {
   if(keranjang.length === 0) return alert('Keranjang masih kosong!');
-  
   const total = keranjang.reduce((acc, item) => acc + (item.harga * item.qty), 0);
   const bayar = Number(document.getElementById('bayar').value);
-  
   if(bayar < total) return alert('Uang pembayaran kurang!');
   
-  const kembalian = bayar - total;
-
   try {
-    await addDoc(collection(db, "penjualan"), {
-      userId,
-      items: keranjang,
-      total,
-      bayar,
-      kembalian,
-      waktu: serverTimestamp()
-    });
-    
-    // Cetak Struk Sederhana via Alert / Prompt Browser
+    await addDoc(collection(db, "penjualan"), { userId, items: keranjang, total, bayar, kembalian: bayar - total, waktu: serverTimestamp() });
     let strukText = `=== STRUK PEMBAYARAN ===\n\n`;
-    keranjang.forEach(item => {
-      strukText += `${item.nama} x${item.qty} : ${formatRupiah(item.harga * item.qty)}\n`;
-    });
-    strukText += `\n-----------------------\n`;
-    strukText += `Total      : ${formatRupiah(total)}\n`;
-    strukText += `Bayar      : ${formatRupiah(bayar)}\n`;
-    strukText += `Kembalian  : ${formatRupiah(kembalian)}\n\n`;
-    strukText += `Transaksi Berhasil disimpan!`;
-    
+    keranjang.forEach(item => { strukText += `${item.nama} x${item.qty} : ${formatRupiah(item.harga * item.qty)}\n`; });
+    strukText += `\n-----------------------\nTotal: ${formatRupiah(total)}\nBayar: ${formatRupiah(bayar)}\nKembalian: ${formatRupiah(bayar - total)}\n\nSukses!`;
     alert(strukText);
-
-    // Reset Form Kasir
     keranjang = [];
     document.getElementById('bayar').value = '';
     renderKeranjang();
