@@ -196,13 +196,25 @@ function listenProduk(){
   });
 }
 
-// MANAGEMENT AKTIVASI SCANNER KAMERA
 window.scanBarcode = (targetInputId) => {
+  // Munculkan kembali kotak hitam tempat kamera
   document.getElementById('cameraArea').classList.remove('hidden');
   
+  // SOLUSI UTAMA: Jika mesin kamera lama sudah ada, hancurkan total secara paksa!
   if (html5QrCode) {
-    html5QrCode.stop().then(() => startScanner(targetInputId)).catch(() => startScanner(targetInputId));
+    html5QrCode.stop()
+      .then(() => {
+        html5QrCode = null; // Kosongkan instance lama
+        startScanner(targetInputId); // Baru jalankan kamera baru
+      })
+      .catch(() => {
+        // Jika stop gagal karena kamera memang belum jalan, paksa hapus dan reset elemennya
+        html5QrCode = null;
+        document.getElementById('reader').innerHTML = ""; 
+        startScanner(targetInputId);
+      });
   } else {
+    // Jika benar-benar baru pertama kali diklik
     startScanner(targetInputId);
   }
 }
@@ -243,7 +255,14 @@ function startScanner(targetInputId) {
 window.tutupKameraManual = () => {
   document.getElementById('cameraArea').classList.add('hidden');
   if (html5QrCode) {
-    html5QrCode.stop().catch(()=>{});
+    html5QrCode.stop()
+      .then(() => {
+        html5QrCode = null; // Reset total setelah kamera mati
+      })
+      .catch(() => {
+        html5QrCode = null;
+        document.getElementById('reader').innerHTML = ""; // Bersihkan sisa elemen video browser jika hang
+      });
   }
 }
 
