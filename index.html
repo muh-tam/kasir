@@ -6,20 +6,37 @@
 <title>Kasir Mini Portable Pro</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
-  body { font-family: sans-serif; background: #f5f5f5; margin: 0; padding: 20px; color: #333; }
+  body { font-family: sans-serif; background: #f5f5f5; margin: 0; padding: 15px; color: #333; }
   .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
-  button { background: #4285f4; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; margin: 4px 0; font-weight: bold; width: 100%; box-sizing: border-box; }
+  
+  /* Desain Header & Logout */
+  .header-app { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+  .header-app h2 { margin: 0; font-size: 18px; }
+  
+  /* Sistem Tab Premium */
+  .tab-container { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 20px; gap: 4px; }
+  .tab-button { flex: 1; background: #e0e0e0; color: #555; border: none; padding: 12px 8px; font-weight: bold; cursor: pointer; border-radius: 8px 8px 0 0; transition: all 0.3s ease; font-size: 13px; text-align: center; }
+  .tab-button.active { background: #4285f4; color: white; border-bottom: 2px solid #1a73e8; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Tombol & Form umum */
+  button { background: #4285f4; color: white; border: none; padding: 12px 16px; border-radius: 8px; cursor: pointer; margin: 6px 0; font-weight: bold; width: 100%; box-sizing: border-box; font-size: 14px; }
   button.secondary { background: #34a853; }
-  button.danger { background: #db4437; width: auto; padding: 4px 10px; }
-  input { padding: 10px; width: 100%; margin: 6px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+  button.danger { background: #db4437; width: auto; padding: 6px 12px; font-size: 12px; border-radius: 6px; }
+  input { padding: 12px; width: 100%; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
   .hidden { display: none; }
+  
+  /* Kamera Scanner */
   #reader { width: 100%; margin: 10px 0; border-radius: 8px; overflow: hidden; background: #000; }
-  .produk, .cart-item { border-bottom: 1px solid #eee; padding: 10px 0; display: flex; justify-content: space-between; align-items: center; }
-  .total { font-size: 22px; font-weight: bold; margin: 15px 0; color: #222; border-top: 2px dashed #eee; padding-top: 10px; }
-  .flex-group { display: flex; gap: 8px; }
-  .flex-group button { width: auto; white-space: nowrap; }
+  
+  /* List data & Totalan */
+  .produk, .cart-item { border-bottom: 1px solid #eee; padding: 12px 0; display: flex; justify-content: space-between; align-items: center; }
+  .total { font-size: 24px; font-weight: bold; margin: 15px 0; color: #111; background: #e8f0fe; padding: 12px; border-radius: 8px; text-align: center; }
+  .flex-group { display: flex; gap: 8px; align-items: center; }
+  .flex-group button { width: auto; white-space: nowrap; margin: 0; height: 45px; }
   small { color: #777; }
-  #listProduk { max-height: 200px; overflow-y: auto; margin-top: 10px; border: 1px solid #eee; padding: 10px; border-radius: 6px; }
+  #listProduk { max-height: 250px; overflow-y: auto; margin-top: 15px; border: 1px solid #eee; padding: 10px; border-radius: 8px; background: #fafafa; }
 </style>
 </head>
 <body>
@@ -31,41 +48,57 @@
 </div>
 
 <div class="container hidden" id="appBox">
-  <h2>Halo, <span id="userName"></span> 👋</h2>
-  <button class="danger" onclick="logout()" style="width: auto;">Logout</button>
-  <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-
-  <h3>1. Tambah / Update Produk</h3>
-  <input id="namaProduk" placeholder="Nama Produk">
-  <input id="hargaProduk" type="number" placeholder="Harga Jual (Rp)">
-  <div class="flex-group">
-    <input id="barcodeProduk" placeholder="Barcode / QR Code">
-    <button onclick="scanBarcode('barcodeProduk')">📷 Scan</button>
-  </div>
-  <button class="secondary" onclick="tambahProduk()">Simpan Produk</button>
   
-  <div id="listProduk"></div>
-
-  <hr style="border: 0; border-top: 1px solid #eee; margin: 25px 0;">
-  
-  <h3>2. Kasir (Scan Barang)</h3>
-  <button onclick="scanBarcode('scanKasir')">📷 Buka Scanner Kasir</button>
-  <div id="reader" class="hidden"></div>
-  
-  <div class="flex-group" style="margin-top: 8px;">
-    <input id="manualBarcode" placeholder="Ketik barcode manual jika scan gagal...">
-    <button onclick="tambahManualKasir()">Tambah</button>
+  <div class="header-app">
+    <h2>Halo, <span id="userName"></span> 👋</h2>
+    <button class="danger" onclick="logout()">Logout</button>
   </div>
 
-  <div id="keranjang"></div>
-  <div class="total">Total: <span id="totalHarga">Rp0</span></div>
-  
-  <h3>3. Pembayaran</h3>
-  <input id="bayar" type="number" placeholder="Jumlah Uang Tunai (Rp)" oninput="hitungKembalian()">
-  <div style="font-size: 18px; margin: 10px 0; font-weight: bold;">
-    Kembalian: <span id="kembalian">Rp0</span>
+  <div class="tab-container">
+    <button class="tab-button active" onclick="switchTab('tabTambah')">1. Tambah Produk</button>
+    <button class="tab-button" onclick="switchTab('tabKasir')">2. Scan Barang</button>
+    <button class="tab-button" onclick="switchTab('tabBayar')">3. Pembayaran</button>
   </div>
-  <button onclick="simpanTransaksi()">Simpan & Cetak Struk via Alert</button>
+
+  <div id="tabTambah" class="tab-content active">
+    <h3>Tambah / Update Produk</h3>
+    <input id="namaProduk" placeholder="Nama Produk">
+    <input id="hargaProduk" type="number" placeholder="Harga Jual (Rp)">
+    <div class="flex-group">
+      <input id="barcodeProduk" placeholder="Barcode / QR Code">
+      <button onclick="scanBarcode('barcodeProduk')">📷 Scan</button>
+    </div>
+    <button class="secondary" onclick="tambahProduk()">Simpan Produk</button>
+    
+    <div id="listProduk"></div>
+  </div>
+
+  <div id="tabKasir" class="tab-content">
+    <h3>Kasir (Scan Barang)</h3>
+    <button style="background: #1a73e8;" onclick="scanBarcode('scanKasir')">📷 Buka Kamera Scanner</button>
+    <div id="reader" class="hidden"></div>
+    
+    <div class="flex-group" style="margin-top: 10px; margin-bottom: 15px;">
+      <input id="manualBarcode" placeholder="Ketik manual jika barcode rusak...">
+      <button onclick="tambahManualKasir()">Tambah</button>
+    </div>
+
+    <div id="keranjang"></div>
+    <div class="total">Total: <span id="totalHarga">Rp0</span></div>
+  </div>
+
+  <div id="tabBayar" class="tab-content">
+    <h3>Pembayaran & Cetak</h3>
+    <div class="total" style="background: #e6f4ea; color: #137333;">Total Tagihan: <span id="totalTagihanTab3">Rp0</span></div>
+    
+    <input id="bayar" type="number" placeholder="Masukkan Jumlah Uang Tunai (Rp)" oninput="hitungKembalian()">
+    
+    <div style="font-size: 20px; margin: 20px 0; font-weight: bold; text-align: center; border: 2px dashed #ddd; padding: 15px; border-radius: 8px;">
+      Kembalian: <span id="kembalian" style="color: #d93025;">Rp0</span>
+    </div>
+    <button class="secondary" style="font-size: 16px; padding: 15px;" onclick="simpanTransaksi()">Simpan & Cetak Struk via Alert</button>
+  </div>
+
 </div>
 
 <script type="module">
@@ -96,10 +129,30 @@ let html5QrCode = null;
 
 const formatRupiah = (angka) => "Rp" + Number(angka).toLocaleString('id-ID');
 
+// FUNGSI PERPINDAHAN TAB
+window.switchTab = (tabId) => {
+  // Matikan semua content tab
+  document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+  // Matikan semua tombol aktif
+  document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
+  
+  // Aktifkan tab & tombol yang dipilih
+  document.getElementById(tabId).classList.add('active');
+  event.currentTarget.classList.add('active');
+
+  // Matikan scanner secara otomatis saat berpindah tab agar menghemat baterai HP
+  if (html5QrCode && tabId !== 'tabKasir' && tabId !== 'tabTambah') {
+    html5QrCode.stop().then(() => {
+      document.getElementById('reader').classList.add('hidden');
+    }).catch(()=>{});
+  }
+}
+
 window.loginGoogle = async () => {
   const provider = new GoogleAuthProvider();
   await signInWithPopup(auth, provider).catch(err => alert(err.message));
 }
+
 window.logout = () => {
   if(html5QrCode) { html5QrCode.stop().catch(()=>{}); }
   signOut(auth);
@@ -227,7 +280,10 @@ function renderKeranjang(){
   });
   if(keranjang.length === 0) html += '<p style="color:#999"><small>Keranjang kosong.</small></p>';
   document.getElementById('keranjang').innerHTML = html;
+  
+  // Update total harga di Tab 2 dan Tab 3 sekalian
   document.getElementById('totalHarga').innerText = formatRupiah(total);
+  document.getElementById('totalTagihanTab3').innerText = formatRupiah(total);
   hitungKembalian();
 }
 
@@ -262,6 +318,9 @@ window.simpanTransaksi = async () => {
     keranjang = [];
     document.getElementById('bayar').value = '';
     renderKeranjang();
+    
+    // Kembalikan otomatis ke Tab Kasir setelah transaksi selesai sukses
+    switchTab('tabKasir');
   } catch (error) {
     alert("Gagal menyimpan transaksi: " + error.message);
   }
