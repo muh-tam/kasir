@@ -129,16 +129,25 @@ let html5QrCode = null;
 
 const formatRupiah = (angka) => "Rp" + Number(angka).toLocaleString('id-ID');
 
-// FUNGSI PERPINDAHAN TAB
+// FUNGSI PERPINDAHAN TAB (YANG BARU & SUDAH AMAN)
 window.switchTab = (tabId) => {
   // Matikan semua content tab
   document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
   // Matikan semua tombol aktif
   document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
   
-  // Aktifkan tab & tombol yang dipilih
+  // Aktifkan konten tab yang dipilih
   document.getElementById(tabId).classList.add('active');
-  event.currentTarget.classList.add('active');
+  
+  // Amankan pewarnaan tombol tab, baik diklik manual maupun otomatis oleh sistem
+  if (window.event && window.event.currentTarget && window.event.currentTarget.classList) {
+    window.event.currentTarget.classList.add('active');
+  } else {
+    // Jika dipicu otomatis, cari tombolnya lewat teks/id-nya secara manual
+    const indexBtn = tabId === 'tabTambah' ? 0 : tabId === 'tabKasir' ? 1 : 2;
+    const targets = document.querySelectorAll('.tab-button');
+    if(targets[indexBtn]) targets[indexBtn].classList.add('active');
+  }
 
   // Matikan scanner secara otomatis saat berpindah tab agar menghemat baterai HP
   if (html5QrCode && tabId !== 'tabKasir' && tabId !== 'tabTambah') {
