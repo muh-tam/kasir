@@ -83,21 +83,6 @@ const firebaseConfig = {
   messagingSenderId: "634322105919",
   appId: "1:634322105919:web:42ddc9f849cd11d0d92a8a"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-// ==========================================
-// GANTI INI DENGAN KONFIGURASI FIREBASE KAMU
-// ==========================================
-const firebaseConfig = {
-  apiKey: "API_KEY_KAMU",
-  authDomain: "PROJECT_ID.firebaseapp.com",
-  projectId: "PROJECT_ID",
-  storageBucket: "PROJECT_ID.appspot.com",
-  messagingSenderId: "SENDER_ID",
-  appId: "APP_ID"
-};
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
